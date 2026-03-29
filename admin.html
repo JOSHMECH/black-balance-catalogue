@@ -307,7 +307,7 @@
         </div>
         <button class="url-toggle" onclick="toggleUrlInput()">+ Use image URL instead</button>
         <div id="urlInputWrap" style="display:none;margin-top:8px">
-          <input class="field-input" type="url" id="prodImgUrl" placeholder="https://example.com/image.jpg" oninput="previewFromUrl(this.value)"/>
+          <input class="field-input" type="url" id="prodImgUrl" placeholder="https://example.com/image.jpg" oninput="previewFromUrl(this.value)" onpaste="setTimeout(() => previewFromUrl(this.value), 10)" onchange="previewFromUrl(this.value)"/>
         </div>
       </div>
 
