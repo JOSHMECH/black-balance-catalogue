@@ -188,6 +188,87 @@
     #toast { position: fixed; bottom: 36px; right: 36px; background: var(--card); border: 1px solid var(--gold); color: var(--white); padding: 13px 22px; font-size: .78rem; z-index: 9000; transform: translateY(18px); opacity: 0; transition: all .3s; pointer-events: none; max-width: 300px; }
     #toast.show { transform: translateY(0); opacity: 1; }
 
+    /* FULLSCREEN PREVIEW */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 10, 0.92);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s ease;
+      cursor: pointer;
+    }
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      max-width: 600px;
+      width: 90vw;
+      max-height: 90vh;
+      text-align: center;
+      padding: 40px 30px 30px;
+      position: relative;
+      transform: scale(0.95);
+      transition: transform .3s ease;
+      cursor: default;
+    }
+    .modal-overlay.show .modal-content {
+      transform: scale(1);
+    }
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.8rem;
+      line-height: 1;
+      padding: 5px;
+      cursor: pointer;
+      transition: color .2s;
+    }
+    .modal-close:hover {
+      color: var(--white);
+    }
+    #modalImage {
+      max-width: 100%;
+      max-height: 55vh;
+      object-fit: contain;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+    #modalName {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.2rem;
+      letter-spacing: .1em;
+      line-height: 1.1;
+    }
+    #modalDesc {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-top: 5px;
+      max-width: 50ch;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #modalPrice {
+      font-size: 1.1rem;
+      color: var(--gold);
+      margin-top: 15px;
+      font-weight: 500;
+    }
+
     /* RESPONSIVE */
     @media (max-width:900px) {
       header { padding: 15px 24px; } nav { gap: 14px; }
@@ -328,6 +409,17 @@
 
 <div id="toast"></div>
 
+<!-- FULLSCREEN PREVIEW MODAL -->
+<div id="previewModal" class="modal-overlay" onclick="closePreviewModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closePreviewModal()">×</button>
+    <img id="modalImage" src="" alt="Product Preview"/>
+    <h3 id="modalName"></h3>
+    <p id="modalDesc"></p>
+    <p id="modalPrice"></p>
+  </div>
+</div>
+
 <script>
 // ── FIREBASE INIT ──
 const IS_CONFIGURED = (typeof firebaseConfig !== 'undefined') && firebaseConfig.apiKey !== 'YOUR_API_KEY';
@@ -419,7 +511,7 @@ function renderProducts() {
     return;
   }
   grid.innerHTML = list.map((p, i) => `
-    <div class="product-card" style="animation-delay:${i*.055}s">
+    <div class="product-card" style="animation-delay:${i*.055}s" onclick="openPreviewModal('${p._id}')">
       <div class="product-img-wrap">
         <img src="${esc(p.imageUrl || blankImg())}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='${blankImg()}'"/>
         ${p.badge ? `<span class="product-badge ${p.badge==='Sold Out'?'sold':''}">${esc(p.badge)}</span>` : ''}
@@ -441,6 +533,24 @@ function renderState(h, p) {
       <h3>${h}</h3><p>${p}</p>
     </div>`;
 }
+
+// ── PREVIEW MODAL ──
+function openPreviewModal(productId) {
+  const product = allProducts.find(p => p._id === productId);
+  if (!product) return;
+
+  document.getElementById('modalImage').src = product.imageUrl || blankImg();
+  document.getElementById('modalName').textContent = product.name;
+  document.getElementById('modalDesc').textContent = product.description || '';
+  document.getElementById('modalPrice').textContent = `₦${Number(product.price).toLocaleString('en-NG')}`;
+
+  document.getElementById('previewModal').classList.add('show');
+}
+
+function closePreviewModal() {
+  document.getElementById('previewModal').classList.remove('show');
+}
+
 
 // ── WAITLIST ──
 async function submitWaitlist() {
