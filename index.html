@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BLACK BALANCE — Nigerian Clothing Brand</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- Shared Config -->
+  <script src="firebase-config.js"></script>
+  <style>
+    :root {
+      --black: #0a0a0a; --deep: #111111; --card: #161616;
+      --gold: #c9a84c; --gold-light: #e8c97a;
+      --white: #f5f0e8; --muted: #888880;
+      --border: rgba(201,168,76,0.15);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--black); color: var(--white); font-family: 'DM Sans', sans-serif; font-weight: 300; overflow-x: hidden; }
+
+    /* CURSOR */
+    * { cursor: none !important; }
+    #cursor {
+      position: fixed; width: 10px; height: 10px; background: var(--gold);
+      border-radius: 50%; pointer-events: none; z-index: 9999;
+      transform: translate(-50%,-50%); transition: width .2s, height .2s, background .2s;
+    }
+    #cursor.grow { width: 38px; height: 38px; background: transparent; border: 1px solid var(--gold); }
+
+    /* LOADER */
+    #loader {
+      position: fixed; inset: 0; background: var(--black);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9000; flex-direction: column; gap: 14px;
+      transition: opacity .6s ease;
+    }
+    #loader.hide { opacity: 0; pointer-events: none; }
+    .loader-brand { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2.5rem,8vw,5rem); letter-spacing: .4em; }
+    .loader-line { width: 0; height: 1px; background: var(--gold); animation: expandLine 1.4s ease forwards .3s; }
+    @keyframes expandLine { to { width: 200px; } }
+
+    /* HEADER */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 800;
+      padding: 20px 40px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border); backdrop-filter: blur(20px);
+      background: rgba(10,10,10,0.85); transition: padding .3s;
+    }
+    header.scrolled { padding: 12px 40px; }
+    .brand { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: .35em; color: var(--white); text-decoration: none; }
+    .brand span { color: var(--gold); }
+    nav { display: flex; gap: 28px; align-items: center; }
+    nav a { font-size: .68rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color .2s; }
+    nav a:hover { color: var(--gold); }
+    .nav-admin { padding: 7px 16px; border: 1px solid var(--border); color: var(--gold) !important; }
+    .nav-admin:hover { background: rgba(201,168,76,.1); }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh; display: grid; place-items: center;
+      text-align: center; position: relative; padding: 120px 40px 80px; overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 100%, rgba(201,168,76,.08) 0%, transparent 70%),
+                  radial-gradient(ellipse 80% 40% at 20% 0%, rgba(201,168,76,.04) 0%, transparent 60%);
+    }
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(201,168,76,.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(201,168,76,.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+    }
+    .hero-content { position: relative; z-index: 1; }
+    .hero-eyebrow { font-size: .64rem; letter-spacing: .4em; text-transform: uppercase; color: var(--gold); margin-bottom: 18px; opacity: 0; animation: fadeUp .8s ease forwards 1.2s; }
+    .hero-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(4rem,14vw,11rem); letter-spacing: .08em; line-height: .9; opacity: 0; animation: fadeUp .9s ease forwards 1.4s; }
+    .hero-title .gold { color: var(--gold); }
+    .hero-sub { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(1rem,2.5vw,1.5rem); color: var(--muted); margin-top: 14px; opacity: 0; animation: fadeUp .8s ease forwards 1.6s; }
+    .hero-cta { margin-top: 46px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; opacity: 0; animation: fadeUp .8s ease forwards 1.8s; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 14px 34px; background: var(--gold); color: var(--black); font-size: .7rem; letter-spacing: .25em; text-transform: uppercase; font-weight: 500; border: none; text-decoration: none; transition: background .2s, transform .2s; }
+    .btn-primary:hover { background: var(--gold-light); transform: translateY(-2px); }
+    .btn-outline { display: inline-flex; align-items: center; gap: 8px; padding: 14px 34px; background: transparent; color: var(--white); font-size: .7rem; letter-spacing: .25em; text-transform: uppercase; border: 1px solid rgba(245,240,232,.3); text-decoration: none; transition: border-color .2s, color .2s; }
+    .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* MARQUEE */
+    .marquee-wrap { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); overflow: hidden; padding: 13px 0; background: var(--deep); }
+    .marquee-track { display: flex; gap: 60px; animation: marquee 22s linear infinite; width: max-content; }
+    .marquee-item { font-family: 'Bebas Neue', sans-serif; font-size: .88rem; letter-spacing: .3em; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 60px; }
+    .marquee-item .dot { width: 4px; height: 4px; background: var(--gold); border-radius: 50%; }
+    @keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+    /* SECTION HEADER */
+    .section-header { text-align: center; padding: 80px 40px 36px; }
+    .section-tag { font-size: .62rem; letter-spacing: .4em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; display: block; }
+    .section-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2.5rem,6vw,4.5rem); letter-spacing: .1em; line-height: 1; }
+    .section-desc { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--muted); font-size: 1.08rem; margin-top: 8px; }
+
+    /* SETUP BANNER */
+    .setup-banner { background: rgba(201,168,76,.07); border: 1px solid rgba(201,168,76,.2); padding: 14px 24px; text-align: center; font-size: .78rem; color: var(--gold); letter-spacing: .05em; margin: 0 40px 24px; max-width: 1320px; margin-left: auto; margin-right: auto; display: none; }
+    .setup-banner a { color: var(--white); margin-left: 8px; }
+    .setup-banner.show { display: block; }
+
+    /* FILTER BAR */
+    .filter-bar { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 0 40px 36px; }
+    .filter-btn { padding: 8px 20px; background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: .64rem; letter-spacing: .2em; text-transform: uppercase; transition: all .2s; }
+    .filter-btn:hover, .filter-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,.06); }
+
+    /* CATALOGUE */
+    .catalogue { padding: 0 40px 80px; max-width: 1400px; margin: 0 auto; }
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 24px; }
+
+    /* SKELETON */
+    .skeleton-card { background: var(--card); border: 1px solid var(--border); overflow: hidden; }
+    .skeleton-img { aspect-ratio: 3/4; background: #1a1a1a; position: relative; overflow: hidden; }
+    .skeleton-img::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(201,168,76,.04),transparent); animation:shimmer 1.5s infinite; }
+    @keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+    .skeleton-info { padding: 16px 20px 20px; }
+    .skeleton-line { height: 10px; border-radius: 2px; margin-bottom: 8px; background: rgba(255,255,255,.05); animation: pulse 1.5s infinite; }
+    .skeleton-line.short { width: 50%; }
+    @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.9} }
+
+    /* PRODUCT CARD */
+    .product-card { background: var(--card); border: 1px solid var(--border); overflow: hidden; opacity: 0; transform: translateY(18px); animation: cardIn .5s ease forwards; }
+    @keyframes cardIn { to{opacity:1;transform:translateY(0)} }
+    .product-img-wrap { position: relative; aspect-ratio: 3/4; overflow: hidden; background: #1a1a1a; }
+    .product-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.25,.46,.45,.94); }
+    .product-card:hover .product-img-wrap img { transform: scale(1.06); }
+    .product-badge { position: absolute; top: 12px; left: 12px; background: var(--gold); color: var(--black); font-size: .54rem; letter-spacing: .2em; text-transform: uppercase; padding: 4px 10px; font-weight: 500; }
+    .product-badge.sold { background: #2a2a2a; color: var(--muted); }
+    .product-overlay { position: absolute; inset: 0; background: rgba(10,10,10,.72); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .3s; }
+    .product-card:hover .product-overlay { opacity: 1; }
+    .overlay-inner { font-size: .64rem; letter-spacing: .28em; text-transform: uppercase; color: var(--white); border: 1px solid rgba(245,240,232,.5); padding: 10px 22px; }
+    .product-info { padding: 16px 20px 20px; border-top: 1px solid var(--border); }
+    .product-cat { font-size: .57rem; letter-spacing: .25em; text-transform: uppercase; color: var(--gold); margin-bottom: 5px; }
+    .product-name { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 4px; }
+    .product-price { font-size: .85rem; color: var(--muted); }
+    .product-price strong { color: var(--gold); font-weight: 500; }
+
+    /* EMPTY / ERROR */
+    .state-box { grid-column: 1/-1; text-align: center; padding: 80px 20px; border: 1px dashed var(--border); }
+    .state-icon { font-size: 2.8rem; opacity: .2; margin-bottom: 14px; }
+    .state-box h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; color: var(--muted); font-weight: 300; }
+    .state-box p { font-size: .78rem; color: var(--muted); margin-top: 6px; opacity: .5; }
+
+    /* WAITLIST */
+    .waitlist-section { background: var(--deep); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 100px 40px; position: relative; overflow: hidden; }
+    .waitlist-section::before { content:''; position:absolute; top:-100px; left:50%; transform:translateX(-50%); width:600px; height:400px; background:radial-gradient(ellipse,rgba(201,168,76,.07) 0%,transparent 70%); pointer-events:none; }
+    .waitlist-inner { max-width: 580px; margin: 0 auto; position: relative; z-index: 1; }
+    .waitlist-tag { font-size: .62rem; letter-spacing: .4em; text-transform: uppercase; color: var(--gold); display: block; margin-bottom: 10px; text-align: center; }
+    .waitlist-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2rem,5vw,3.5rem); letter-spacing: .1em; text-align: center; line-height: 1; margin-bottom: 8px; }
+    .waitlist-sub { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--muted); text-align: center; font-size: 1rem; margin-bottom: 38px; }
+    .waitlist-form { display: flex; flex-direction: column; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-size: .59rem; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); }
+    .form-input { background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--white); font-family: 'DM Sans', sans-serif; font-size: .9rem; padding: 13px 17px; outline: none; transition: border-color .2s, background .2s; }
+    .form-input::placeholder { color: rgba(136,136,128,.4); }
+    .form-input:focus { border-color: var(--gold); background: rgba(201,168,76,.04); }
+    .waitlist-btn { background: var(--gold); color: var(--black); border: none; padding: 15px; font-family: 'DM Sans', sans-serif; font-size: .7rem; letter-spacing: .28em; text-transform: uppercase; font-weight: 500; margin-top: 6px; transition: background .2s, transform .2s; }
+    .waitlist-btn:hover { background: var(--gold-light); transform: translateY(-2px); }
+    .waitlist-btn:disabled { opacity: .5; transform: none; }
+    .form-msg { font-size: .74rem; padding: 10px 14px; display: none; }
+    .form-msg.error { display:block; color:#ff6b6b; background:rgba(220,50,50,.08); border:1px solid rgba(220,50,50,.18); }
+    .form-msg.info  { display:block; color:var(--gold); background:rgba(201,168,76,.08); border:1px solid var(--border); }
+    .waitlist-success { text-align: center; padding: 40px; display: none; }
+    .waitlist-success.show { display: block; }
+    .success-icon { font-size: 2.4rem; margin-bottom: 14px; }
+    .success-text { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-style: italic; color: var(--gold); }
+    .success-sub { font-size: .78rem; color: var(--muted); margin-top: 8px; }
+
+    /* FOOTER */
+    footer { padding: 60px 40px 36px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; }
+    .footer-brand { font-family: 'Bebas Neue', sans-serif; font-size: 1.9rem; letter-spacing: .3em; margin-bottom: 10px; }
+    .footer-brand span { color: var(--gold); }
+    .footer-tagline { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--muted); font-size: .93rem; }
+    .footer-col h4 { font-size: .63rem; letter-spacing: .3em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul li a { font-size: .8rem; color: var(--muted); text-decoration: none; transition: color .2s; }
+    .footer-col ul li a:hover { color: var(--white); }
+    .footer-bottom { grid-column: 1/-1; border-top: 1px solid var(--border); padding-top: 22px; display: flex; justify-content: space-between; align-items: center; font-size: .68rem; color: var(--muted); flex-wrap: wrap; gap: 10px; }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: 36px; right: 36px; background: var(--card); border: 1px solid var(--gold); color: var(--white); padding: 13px 22px; font-size: .78rem; z-index: 9000; transform: translateY(18px); opacity: 0; transition: all .3s; pointer-events: none; max-width: 300px; }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* RESPONSIVE */
+    @media (max-width:900px) {
+      header { padding: 15px 24px; } nav { gap: 14px; }
+      .hero { padding: 100px 24px 60px; }
+      .catalogue,.filter-bar,.section-header { padding-left:24px; padding-right:24px; }
+      .waitlist-section { padding: 60px 24px; }
+      footer { padding: 40px 24px; grid-template-columns: 1fr; }
+      .setup-banner { margin-left:24px; margin-right:24px; }
+    }
+    @media (max-width:600px) {
+      .nav-admin { display: none; }
+      .product-grid { grid-template-columns: repeat(auto-fill,minmax(155px,1fr)); gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div id="cursor"></div>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-brand">BLACK BALANCE</div>
+  <div class="loader-line"></div>
+</div>
+
+<!-- HEADER -->
+<header id="header">
+  <a href="#" class="brand">BLACK <span>BALANCE</span></a>
+  <nav>
+    <a href="#catalogue">Collection</a>
+    <a href="#waitlist">Waitlist</a>
+    <a href="admin.html" class="nav-admin">Admin ↗</a>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Lagos · Nigeria · Est. 2024</p>
+    <h1 class="hero-title">BLACK<br><span class="gold">BALANCE</span></h1>
+    <p class="hero-sub">Where Nigerian heritage meets modern elegance</p>
+    <div class="hero-cta">
+      <a href="#catalogue" class="btn-primary">Explore Collection →</a>
+      <a href="#waitlist" class="btn-outline">Join Waitlist</a>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap"><div class="marquee-track" id="marqueeTrack"></div></div>
+
+<!-- CATALOGUE -->
+<section id="catalogue">
+  <div class="section-header">
+    <span class="section-tag">The Collection</span>
+    <h2 class="section-title">Our Pieces</h2>
+    <p class="section-desc">Crafted for the bold. Worn by the balanced.</p>
+  </div>
+
+  <div class="setup-banner" id="setupBanner">
+    ⚠ Firebase not configured yet — open <strong>firebase-config.js</strong> and add your project keys.
+    <a href="admin.html">Admin Panel →</a>
+  </div>
+
+  <div class="filter-bar" id="filterBar">
+    <button class="filter-btn active" data-filter="all">All Pieces</button>
+  </div>
+
+  <div class="catalogue">
+    <div class="product-grid" id="productGrid">
+      <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-info"><div class="skeleton-line short"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-info"><div class="skeleton-line short"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-info"><div class="skeleton-line short"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- WAITLIST -->
+<section class="waitlist-section" id="waitlist">
+  <div class="waitlist-inner">
+    <span class="waitlist-tag">Be First</span>
+    <h2 class="waitlist-title">Join The Waitlist</h2>
+    <p class="waitlist-sub">Get early access to new drops before anyone else</p>
+    <div id="waitlistFormWrap">
+      <form class="waitlist-form" onsubmit="return false;">
+        <div class="form-group">
+          <label class="form-label" for="wlName">Full Name</label>
+          <input class="form-input" type="text" id="wlName" placeholder="Your full name"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="wlWhatsapp">WhatsApp Number</label>
+          <input class="form-input" type="tel" id="wlWhatsapp" placeholder="+234 800 000 0000"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="wlEmail">Gmail Address</label>
+          <input class="form-input" type="email" id="wlEmail" placeholder="yourname@gmail.com"/>
+        </div>
+        <div class="form-msg" id="wlMsg"></div>
+        <button class="waitlist-btn" id="wlBtn" type="button" onclick="submitWaitlist()">Secure My Spot →</button>
+      </form>
+    </div>
+    <div class="waitlist-success" id="waitlistSuccess">
+      <div class="success-icon">✦</div>
+      <div class="success-text">You're on the list.</div>
+      <div class="success-sub">We'll reach out on WhatsApp and Gmail when the next drop lands.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="footer-brand">BLACK <span>BALANCE</span></div>
+    <p class="footer-tagline">Nigerian-made. Globally worn.</p>
+  </div>
+  <div class="footer-col">
+    <h4>Navigate</h4>
+    <ul>
+      <li><a href="#catalogue">Collection</a></li>
+      <li><a href="#waitlist">Join Waitlist</a></li>
+      <li><a href="admin.html">Admin Panel</a></li>
+    </ul>
+  </div>
+  <div class="footer-col">
+    <h4>Contact</h4>
+    <ul>
+      <li><a href="#">Lagos, Nigeria</a></li>
+      <li><a href="#">blackbalance@gmail.com</a></li>
+      <li><a href="#">+234 800 000 0000</a></li>
+    </ul>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2024 Black Balance. All rights reserved.</span>
+    <span style="color:var(--gold);letter-spacing:.1em">CRAFTED IN NIGERIA</span>
+  </div>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+// ── FIREBASE INIT ──
+const IS_CONFIGURED = (typeof firebaseConfig !== 'undefined') && firebaseConfig.apiKey !== 'YOUR_API_KEY';
+let db = null;
+
+if (IS_CONFIGURED) {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+  } catch(e) { console.error('Firebase init:', e); }
+} else {
+  document.getElementById('setupBanner').classList.add('show');
+}
+
+// ── CURSOR ──
+const cursor = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top  = e.clientY + 'px';
+});
+function addGrow(els) {
+  els.forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('grow'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('grow'));
+  });
+}
+addGrow(document.querySelectorAll('a,button'));
+
+// ── LOADER ──
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const l = document.getElementById('loader');
+    l.classList.add('hide');
+    setTimeout(() => l.remove(), 700);
+  }, 1800);
+});
+
+// ── SCROLL HEADER ──
+window.addEventListener('scroll', () => {
+  document.getElementById('header').classList.toggle('scrolled', window.scrollY > 50);
+});
+
+// ── MARQUEE ──
+const words = ['NEW COLLECTION','NIGERIAN MADE','EXCLUSIVELY CRAFTED','LIMITED PIECES','AUTHENTIC QUALITY','STREET LUXURY'];
+const track = document.getElementById('marqueeTrack');
+const mHtml = words.map(w => `<span class="marquee-item">${w}<span class="dot"></span></span>`).join('');
+track.innerHTML = mHtml + mHtml;
+
+// ── STATE ──
+let allProducts  = [];
+let activeFilter = 'all';
+
+// ── FIRESTORE REAL-TIME LISTENER ──
+function initProductsListener() {
+  if (!db) {
+    renderState('No products yet', 'Configure Firebase and add products via the admin panel.');
+    return;
+  }
+  db.collection('products').onSnapshot(snap => {
+    allProducts = snap.docs.map(doc => ({ _id: doc.id, ...doc.data() }));
+    allProducts.sort((a, b) => a.name.localeCompare(b.name)); // A–Z always
+    buildFilters();
+    renderProducts();
+  }, err => {
+    console.error(err);
+    renderState('Could not load products', 'Check your Firebase configuration and security rules.');
+  });
+}
+
+function buildFilters() {
+  const cats = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+  const bar  = document.getElementById('filterBar');
+  bar.innerHTML = `<button class="filter-btn ${activeFilter==='all'?'active':''}" data-filter="all">All Pieces</button>`
+    + cats.map(c => `<button class="filter-btn ${activeFilter===c?'active':''}" data-filter="${c}">${esc(c)}</button>`).join('');
+  addGrow(bar.querySelectorAll('.filter-btn'));
+  bar.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => {
+    bar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    renderProducts();
+  }));
+}
+
+function renderProducts() {
+  const list = activeFilter === 'all' ? allProducts : allProducts.filter(p => p.category === activeFilter);
+  const grid = document.getElementById('productGrid');
+  if (!list.length) {
+    renderState(allProducts.length ? 'No pieces in this category' : 'No pieces yet', allProducts.length ? 'Try a different filter.' : 'The collection is being curated. Check back soon.');
+    return;
+  }
+  grid.innerHTML = list.map((p, i) => `
+    <div class="product-card" style="animation-delay:${i*.055}s">
+      <div class="product-img-wrap">
+        <img src="${esc(p.imageUrl || blankImg())}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='${blankImg()}'"/>
+        ${p.badge ? `<span class="product-badge ${p.badge==='Sold Out'?'sold':''}">${esc(p.badge)}</span>` : ''}
+        <div class="product-overlay"><span class="overlay-inner">View Piece</span></div>
+      </div>
+      <div class="product-info">
+        <p class="product-cat">${esc(p.category||'Uncategorised')}</p>
+        <p class="product-name">${esc(p.name)}</p>
+        <p class="product-price"><strong>₦${Number(p.price).toLocaleString('en-NG')}</strong></p>
+      </div>
+    </div>`).join('');
+  addGrow(grid.querySelectorAll('.product-card'));
+}
+
+function renderState(h, p) {
+  document.getElementById('productGrid').innerHTML = `
+    <div class="state-box">
+      <div class="state-icon">✦</div>
+      <h3>${h}</h3><p>${p}</p>
+    </div>`;
+}
+
+// ── WAITLIST ──
+async function submitWaitlist() {
+  const name     = document.getElementById('wlName').value.trim();
+  const whatsapp = document.getElementById('wlWhatsapp').value.trim();
+  const email    = document.getElementById('wlEmail').value.trim();
+  const msg      = document.getElementById('wlMsg');
+  const btn      = document.getElementById('wlBtn');
+
+  msg.className = 'form-msg';
+  if (!name || !whatsapp || !email)        return showMsg(msg,'error','Please fill in all fields.');
+  if (!/@gmail\.com$/i.test(email))        return showMsg(msg,'error','Please use a Gmail address (@gmail.com).');
+  if (!/^\+?[\d\s\-(). ]{7,18}$/.test(whatsapp)) return showMsg(msg,'error','Please enter a valid WhatsApp number.');
+  if (!db)                                 return showMsg(msg,'error','Firebase not connected. Contact the admin.');
+
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    const dup = await db.collection('waitlist').where('email','==',email).get();
+    if (!dup.empty) {
+      showMsg(msg,'error','This Gmail is already on the waitlist!');
+      btn.disabled = false; btn.textContent = 'Secure My Spot →'; return;
+    }
+    await db.collection('waitlist').add({
+      name, whatsapp, email,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setTimeout(() => {
+      document.getElementById('waitlistFormWrap').style.display = 'none';
+      document.getElementById('waitlistSuccess').classList.add('show');
+      showToast('Welcome to the Black Balance family! ✦');
+    }, 400);
+  } catch(e) {
+    console.error(e);
+    showMsg(msg,'error','Something went wrong. Please try again.');
+    btn.disabled = false; btn.textContent = 'Secure My Spot →';
+  }
+}
+
+// ── HELPERS ──
+function showMsg(el, type, text) { el.className = 'form-msg ' + type; el.textContent = text; }
+function showToast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+function esc(str) { const d = document.createElement('div'); d.textContent = String(str||''); return d.innerHTML; }
+function blankImg() { return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='500'%3E%3Crect width='400' height='500' fill='%231a1a1a'/%3E%3Ctext x='50%25' y='50%25' font-family='serif' font-size='13' fill='%23444' text-anchor='middle' dy='.3em'%3ENo Image%3C/text%3E%3C/svg%3E`; }
+
+initProductsListener();
+</script>
+</body>
+</html>

@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BLACK BALANCE — Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <!-- Shared Config -->
+  <script src="firebase-config.js"></script>
+  <style>
+    :root {
+      --black: #0a0a0a; --deep: #0f0f0f; --panel: #141414; --card: #1a1a1a;
+      --gold: #c9a84c; --gold-light: #e8c97a; --gold-dim: rgba(201,168,76,0.1);
+      --white: #f5f0e8; --muted: #888880; --border: rgba(201,168,76,0.15);
+      --red: #e05555; --green: #5bc97a;
+    }
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--black); color: var(--white); font-family: 'DM Sans', sans-serif; font-weight: 300; min-height: 100vh; }
+
+    /* ── LOGIN ── */
+    #loginScreen { position: fixed; inset: 0; background: var(--black); display: flex; align-items: center; justify-content: center; z-index: 1000; flex-direction: column; }
+    #loginScreen.hidden { display: none; }
+    .login-box { width: 100%; max-width: 400px; padding: 0 28px; }
+    .login-brand { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; letter-spacing: .35em; text-align: center; margin-bottom: 5px; }
+    .login-brand span { color: var(--gold); }
+    .login-subtitle { text-align: center; font-size: .6rem; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); margin-bottom: 36px; }
+    .login-divider { height: 1px; background: var(--border); margin-bottom: 36px; }
+    .login-label { font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 8px; }
+    .login-input { width: 100%; background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 1rem; padding: 14px 18px; outline: none; margin-bottom: 16px; transition: border-color .2s; letter-spacing: .1em; }
+    .login-input:focus { border-color: var(--gold); }
+    .login-input::placeholder { color: var(--muted); opacity: .4; font-size: .85rem; letter-spacing: .05em; }
+    .login-btn { width: 100%; background: var(--gold); color: var(--black); border: none; padding: 15px; font-family: 'DM Sans', sans-serif; font-size: .7rem; letter-spacing: .3em; text-transform: uppercase; font-weight: 500; transition: background .2s; }
+    .login-btn:hover { background: var(--gold-light); }
+    .login-error { font-size: .74rem; color: var(--red); text-align: center; margin-top: 12px; min-height: 18px; }
+    .login-back { text-align: center; font-size: .6rem; color: var(--muted); margin-top: 20px; letter-spacing: .1em; }
+    .login-back a { color: var(--gold); text-decoration: none; }
+
+    /* ── SETUP NOTICE ── */
+    #setupNotice { background: rgba(201,168,76,.07); border: 1px solid rgba(201,168,76,.25); padding: 20px 24px; margin-bottom: 24px; display: none; }
+    #setupNotice.show { display: block; }
+    #setupNotice h4 { font-size: .65rem; letter-spacing: .25em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+    #setupNotice ol { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+    #setupNotice li { font-size: .8rem; color: var(--muted); line-height: 1.5; }
+    #setupNotice li strong { color: var(--white); }
+    #setupNotice code { font-family: monospace; font-size: .78rem; background: rgba(201,168,76,.1); padding: 1px 6px; color: var(--gold-light); }
+
+    /* ── ADMIN APP ── */
+    #adminApp { display: none; min-height: 100vh; flex-direction: column; }
+    #adminApp.visible { display: flex; }
+
+    /* ── TOPBAR ── */
+    .topbar { position: sticky; top: 0; z-index: 100; background: var(--deep); border-bottom: 1px solid var(--border); padding: 15px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .topbar-brand { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: .3em; display: flex; align-items: center; gap: 12px; }
+    .topbar-brand span { color: var(--gold); }
+    .admin-pill { font-size: .5rem; letter-spacing: .25em; text-transform: uppercase; background: var(--gold-dim); color: var(--gold); border: 1px solid var(--border); padding: 3px 10px; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .topbar-link { font-size: .64rem; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color .2s; }
+    .topbar-link:hover { color: var(--white); }
+    .logout-btn { font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--red); background: transparent; border: 1px solid rgba(224,85,85,.2); padding: 7px 16px; transition: background .2s; }
+    .logout-btn:hover { background: rgba(224,85,85,.08); }
+
+    /* ── FIREBASE STATUS BAR ── */
+    .firebase-status { font-size: .68rem; padding: 8px 32px; text-align: center; }
+    .firebase-status.ok  { background: rgba(91,201,122,.07); color: var(--green); border-bottom: 1px solid rgba(91,201,122,.15); }
+    .firebase-status.err { background: rgba(224,85,85,.07); color: var(--red); border-bottom: 1px solid rgba(224,85,85,.15); }
+
+    /* ── MAIN GRID ── */
+    .admin-main { flex: 1; display: grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 57px); }
+
+    /* ── SIDEBAR ── */
+    .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 28px; overflow-y: auto; max-height: calc(100vh - 57px); position: sticky; top: 57px; }
+    .sidebar-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.35rem; letter-spacing: .2em; margin-bottom: 3px; }
+    .sidebar-sub { font-size: .68rem; color: var(--muted); margin-bottom: 26px; }
+    .form-section { margin-bottom: 20px; }
+    .field-label { font-size: .57rem; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; display: block; }
+    .field-input,.field-select,.field-textarea { width: 100%; background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--white); font-family: 'DM Sans', sans-serif; font-size: .87rem; padding: 11px 13px; outline: none; transition: border-color .2s, background .2s; }
+    .field-input:focus,.field-select:focus,.field-textarea:focus { border-color: var(--gold); background: rgba(201,168,76,.04); }
+    .field-input::placeholder,.field-textarea::placeholder { color: rgba(136,136,128,.4); }
+    .field-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888880' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 34px; }
+    .field-select option { background: #1a1a1a; }
+    .field-textarea { resize: vertical; min-height: 76px; }
+
+    /* IMAGE DROP ZONE */
+    .drop-zone { border: 1px dashed var(--border); background: rgba(255,255,255,.02); padding: 22px 16px; text-align: center; transition: all .2s; position: relative; }
+    .drop-zone.drag-over { border-color: var(--gold); background: var(--gold-dim); }
+    .drop-zone-icon { font-size: 1.8rem; opacity: .35; margin-bottom: 7px; }
+    .drop-zone-text { font-size: .7rem; color: var(--muted); margin-bottom: 3px; }
+    .drop-zone-sub { font-size: .6rem; color: var(--muted); opacity: .5; }
+    #imageFileInput { display: none; }
+    .img-preview-wrap { display: none; margin-top: 10px; position: relative; }
+    .img-preview-wrap img { width: 100%; max-height: 170px; object-fit: cover; border: 1px solid var(--border); }
+    .img-remove { position: absolute; top: 5px; right: 5px; background: rgba(10,10,10,.85); border: 1px solid var(--border); color: var(--red); font-size: .65rem; padding: 3px 7px; transition: background .2s; }
+    .img-remove:hover { background: rgba(224,85,85,.15); }
+
+    /* UPLOAD PROGRESS */
+    .progress-wrap { margin-top: 10px; display: none; }
+    .progress-wrap.show { display: block; }
+    .progress-bar-bg { height: 3px; background: rgba(255,255,255,.06); border-radius: 2px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--gold); width: 0%; transition: width .3s; }
+    .progress-text { font-size: .62rem; color: var(--muted); margin-top: 5px; }
+
+    /* URL INPUT */
+    .url-toggle { font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); background: none; border: none; padding: 0; opacity: .75; transition: opacity .2s; margin-top: 9px; }
+    .url-toggle:hover { opacity: 1; }
+
+    /* BADGES */
+    .badge-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge-opt { font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; padding: 6px 13px; background: transparent; border: 1px solid var(--border); color: var(--muted); transition: all .2s; }
+    .badge-opt.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+
+    /* UPLOAD BUTTON */
+    .upload-btn { width: 100%; background: var(--gold); color: var(--black); border: none; padding: 14px; font-family: 'DM Sans', sans-serif; font-size: .68rem; letter-spacing: .28em; text-transform: uppercase; font-weight: 500; margin-top: 8px; transition: background .2s; }
+    .upload-btn:hover:not(:disabled) { background: var(--gold-light); }
+    .upload-btn:disabled { opacity: .5; }
+    .upload-msg { font-size: .72rem; margin-top: 10px; padding: 10px; text-align: center; display: none; }
+    .upload-msg.success { display:block; color:var(--green); background:rgba(91,201,122,.08); border:1px solid rgba(91,201,122,.15); }
+    .upload-msg.error   { display:block; color:var(--red); background:rgba(224,85,85,.08); border:1px solid rgba(224,85,85,.15); }
+
+    /* ── CONTENT AREA ── */
+    .content-area { padding: 28px 32px; overflow-y: auto; }
+
+    /* STATS */
+    .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
+    .stat-card { background: var(--panel); border: 1px solid var(--border); padding: 18px 22px; }
+    .stat-label { font-size: .57rem; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+    .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 2.3rem; letter-spacing: .1em; color: var(--gold); line-height: 1; }
+    .stat-sub { font-size: .68rem; color: var(--muted); margin-top: 3px; }
+
+    /* TABS */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+    .tab-btn { font-size: .64rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; padding: 11px 22px; transition: color .2s, border-color .2s; margin-bottom: -1px; }
+    .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-btn:hover { color: var(--white); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* TABLE HEADER */
+    .tbl-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+    .tbl-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; letter-spacing: .15em; }
+    .tbl-search { background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--white); font-family: 'DM Sans', sans-serif; font-size: .8rem; padding: 8px 13px; outline: none; width: 210px; transition: border-color .2s; }
+    .tbl-search:focus { border-color: var(--gold); }
+    .tbl-search::placeholder { color: rgba(136,136,128,.4); }
+
+    /* TABLES */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { font-size: .54rem; letter-spacing: .25em; text-transform: uppercase; color: var(--gold); border-bottom: 1px solid var(--border); padding: 9px 11px; text-align: left; font-weight: 400; }
+    .data-table td { padding: 13px 11px; font-size: .81rem; border-bottom: 1px solid rgba(201,168,76,.07); vertical-align: middle; }
+    .data-table tr:hover td { background: rgba(201,168,76,.025); }
+    .prod-thumb { width: 46px; height: 58px; object-fit: cover; border: 1px solid var(--border); }
+    .prod-name-cell { font-family: 'Cormorant Garamond', serif; font-size: .98rem; }
+    .prod-price-cell { color: var(--gold); }
+    .prod-cat-cell { font-size: .59rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+    .badge-pill { font-size: .53rem; letter-spacing: .12em; text-transform: uppercase; background: var(--gold-dim); color: var(--gold); border: 1px solid var(--border); padding: 2px 8px; }
+    .badge-pill.sold { background: rgba(255,255,255,.04); color: var(--muted); border-color: rgba(255,255,255,.08); }
+    .del-btn { background: transparent; border: 1px solid rgba(224,85,85,.2); color: var(--red); font-size: .56rem; letter-spacing: .14em; text-transform: uppercase; padding: 5px 11px; transition: background .2s; }
+    .del-btn:hover { background: rgba(224,85,85,.1); }
+    .wl-email { color: var(--gold-light); }
+    .wl-phone { font-family: monospace; font-size: .75rem; color: var(--muted); }
+    .wl-date { font-size: .68rem; color: var(--muted); }
+    .export-btn { font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; background: var(--gold-dim); border: 1px solid var(--border); color: var(--gold); padding: 8px 18px; transition: background .2s; }
+    .export-btn:hover { background: rgba(201,168,76,.2); }
+
+    /* EMPTY */
+    .tbl-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .tbl-empty p { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.08rem; }
+    .tbl-empty span { font-size: .7rem; display: block; margin-top: 5px; opacity: .5; }
+
+    /* CONFIRM MODAL */
+    #confirmModal { position: fixed; inset: 0; background: rgba(0,0,0,.8); display: none; align-items: center; justify-content: center; z-index: 800; }
+    #confirmModal.open { display: flex; }
+    .modal-box { background: var(--panel); border: 1px solid var(--border); padding: 30px; max-width: 370px; width: 90%; }
+    .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.35rem; letter-spacing: .14em; margin-bottom: 10px; }
+    .modal-body { font-size: .8rem; color: var(--muted); line-height: 1.6; margin-bottom: 22px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-cancel { background: none; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: .63rem; letter-spacing: .14em; text-transform: uppercase; padding: 9px 18px; transition: all .2s; }
+    .modal-cancel:hover { border-color: var(--white); color: var(--white); }
+    .modal-confirm { background: var(--red); border: none; color: #fff; font-family: 'DM Sans', sans-serif; font-size: .63rem; letter-spacing: .14em; text-transform: uppercase; padding: 9px 18px; transition: opacity .2s; }
+    .modal-confirm:hover { opacity: .85; }
+
+    /* TOAST */
+    #adminToast { position: fixed; bottom: 28px; right: 28px; background: var(--card); border: 1px solid var(--gold); color: var(--white); padding: 13px 22px; font-size: .78rem; z-index: 9000; transform: translateY(18px); opacity: 0; transition: all .3s; pointer-events: none; max-width: 320px; }
+    #adminToast.show { transform: translateY(0); opacity: 1; }
+
+    /* RESPONSIVE */
+    @media (max-width:960px) {
+      .admin-main { grid-template-columns: 1fr; }
+      .sidebar { position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width:600px) {
+      .topbar { padding: 14px 18px; }
+      .content-area { padding: 20px 18px; }
+      .sidebar { padding: 20px 18px; }
+      .stats-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div id="setupNotice">
+      <h4>⚠ Firebase Setup Required</h4>
+      <ol>
+        <li>Go to <strong>console.firebase.google.com</strong> and create a project</li>
+        <li>Click the <strong>&lt;/&gt; Web</strong> icon → register an app → copy the config</li>
+        <li>Paste the values into <code>firebase-config.js</code></li>
+        <li>Enable <strong>Firestore Database</strong> (Build → Firestore → Create)</li>
+        <li>Enable <strong>Storage</strong> (Build → Storage → Get Started)</li>
+        <li>Set rules to <strong>test mode</strong> for now → reload this page</li>
+      </ol>
+    </div>
+    <div class="login-brand">BLACK <span>BALANCE</span></div>
+    <p class="login-subtitle">Admin Access Portal</p>
+    <div class="login-divider"></div>
+    <label class="login-label" for="loginPass">Password</label>
+    <input class="login-input" type="password" id="loginPass" placeholder="Enter password"
+           onkeydown="if(event.key==='Enter') doLogin()"/>
+    <button class="login-btn" onclick="doLogin()">Enter Admin Panel →</button>
+    <p class="login-error" id="loginError"></p>
+    <p class="login-back">← <a href="index.html">Back to Catalogue</a></p>
+  </div>
+</div>
+
+<!-- ── ADMIN APP ── -->
+<div id="adminApp">
+  <div class="topbar">
+    <div class="topbar-brand">BLACK <span>BALANCE</span> <span class="admin-pill">Admin</span></div>
+    <div class="topbar-right">
+      <a href="index.html" class="topbar-link">← View Catalogue</a>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="firebase-status" id="firebaseStatus"></div>
+
+  <div class="admin-main">
+    <!-- SIDEBAR: Upload Form -->
+    <aside class="sidebar">
+      <h2 class="sidebar-title">Upload Product</h2>
+      <p class="sidebar-sub">Add a new piece to the live catalogue</p>
+
+      <div class="form-section">
+        <label class="field-label" for="prodName">Product Name *</label>
+        <input class="field-input" type="text" id="prodName" placeholder="e.g. Ankara Wrap Coat"/>
+      </div>
+
+      <div class="form-section">
+        <label class="field-label" for="prodCat">Category *</label>
+        <select class="field-select" id="prodCat">
+          <option value="">Select category…</option>
+          <option>Agbada</option>
+          <option>Ankara Prints</option>
+          <option>Aso-Oke</option>
+          <option>Dashiki</option>
+          <option>Isiagu</option>
+          <option>Kaftan</option>
+          <option>Outerwear</option>
+          <option>Accessories</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="form-section">
+        <label class="field-label" for="prodPrice">Price (₦) *</label>
+        <input class="field-input" type="number" id="prodPrice" placeholder="e.g. 45000" min="0"/>
+      </div>
+
+      <div class="form-section">
+        <label class="field-label" for="prodDesc">Description</label>
+        <textarea class="field-textarea" id="prodDesc" placeholder="Brief description of the piece…"></textarea>
+      </div>
+
+      <div class="form-section">
+        <label class="field-label">Badge</label>
+        <div class="badge-opts">
+          <button class="badge-opt active" data-val="none"     onclick="selectBadge(this)">None</button>
+          <button class="badge-opt"        data-val="New"      onclick="selectBadge(this)">New</button>
+          <button class="badge-opt"        data-val="Limited"  onclick="selectBadge(this)">Limited</button>
+          <button class="badge-opt"        data-val="Sold Out" onclick="selectBadge(this)">Sold Out</button>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <label class="field-label">Product Image</label>
+        <div class="drop-zone" id="dropZone"
+             onclick="document.getElementById('imageFileInput').click()"
+             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <div class="drop-zone-icon">🖼</div>
+          <p class="drop-zone-text">Click or drag &amp; drop image</p>
+          <p class="drop-zone-sub">JPG, PNG, WEBP — max 5MB</p>
+        </div>
+        <input type="file" id="imageFileInput" accept="image/*" onchange="handleFileSelect(event)"/>
+        <div class="img-preview-wrap" id="imgPreviewWrap">
+          <img id="imgPreview" src="" alt="Preview"/>
+          <button class="img-remove" onclick="removeImage()">✕</button>
+        </div>
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+          <p class="progress-text" id="progressText">Uploading…</p>
+        </div>
+        <button class="url-toggle" onclick="toggleUrlInput()">+ Use image URL instead</button>
+        <div id="urlInputWrap" style="display:none;margin-top:8px">
+          <input class="field-input" type="url" id="prodImgUrl" placeholder="https://example.com/image.jpg" oninput="previewFromUrl(this.value)"/>
+        </div>
+      </div>
+
+      <div class="upload-msg" id="uploadMsg"></div>
+      <button class="upload-btn" id="uploadBtn" onclick="uploadProduct()">Add to Catalogue →</button>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <main class="content-area">
+      <!-- STATS -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <p class="stat-label">Total Products</p>
+          <p class="stat-value" id="statProducts">—</p>
+          <p class="stat-sub">In catalogue</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Waitlist Members</p>
+          <p class="stat-value" id="statWaitlist">—</p>
+          <p class="stat-sub">Signed up</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Categories</p>
+          <p class="stat-value" id="statCats">—</p>
+          <p class="stat-sub">Active</p>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('products',this)">Products</button>
+        <button class="tab-btn"        onclick="switchTab('waitlist',this)">Waitlist</button>
+      </div>
+
+      <!-- PRODUCTS TAB -->
+      <div class="tab-panel active" id="tab-products">
+        <div class="tbl-head">
+          <span class="tbl-title">All Products</span>
+          <input class="tbl-search" type="text" id="prodSearch" placeholder="Search…" oninput="filterProductTable()"/>
+        </div>
+        <div id="productTableWrap"></div>
+      </div>
+
+      <!-- WAITLIST TAB -->
+      <div class="tab-panel" id="tab-waitlist">
+        <div class="tbl-head">
+          <span class="tbl-title">Waitlist</span>
+          <button class="export-btn" onclick="exportWaitlistCSV()">Export CSV ↓</button>
+        </div>
+        <div id="waitlistTableWrap"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal">
+  <div class="modal-box">
+    <p class="modal-title" id="modalTitle">Confirm Delete</p>
+    <p class="modal-body"  id="modalBody">This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="modal-cancel"  onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" id="modalConfirmBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="adminToast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════
+const IS_CONFIGURED = (typeof firebaseConfig !== 'undefined') && firebaseConfig.apiKey !== 'YOUR_API_KEY';
+let db = null, storage = null;
+
+if (IS_CONFIGURED) {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db      = firebase.firestore();
+    storage = firebase.storage();
+  } catch(e) { console.error('Firebase init error:', e); }
+} else {
+  // Show setup guide on login screen
+  document.getElementById('setupNotice').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+const SESSION_KEY = 'bb_admin_v2';
+
+function checkSession() {
+  if (sessionStorage.getItem(SESSION_KEY) === 'true') showAdmin();
+}
+
+function doLogin() {
+  const pass = document.getElementById('loginPass').value;
+  const err  = document.getElementById('loginError');
+  if (pass === ADMIN_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, 'true');
+    document.getElementById('loginScreen').classList.add('hidden');
+    showAdmin();
+  } else {
+    err.textContent = 'Incorrect password. Try again.';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginPass').focus();
+    setTimeout(() => err.textContent = '', 3000);
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function showAdmin() {
+  const app = document.getElementById('adminApp');
+  app.classList.add('visible');
+
+  const bar = document.getElementById('firebaseStatus');
+  if (!IS_CONFIGURED) {
+    bar.className = 'firebase-status err';
+    bar.textContent = '⚠ Firebase not configured — fill in firebase-config.js to enable live data.';
+  } else if (db) {
+    bar.className = 'firebase-status ok';
+    bar.textContent = '✓ Firebase connected — products you upload go live immediately for all visitors.';
+  }
+
+  if (db) initAdminListeners();
+}
+
+// ═══════════════════════════════════════════════
+// REAL-TIME LISTENERS
+// ═══════════════════════════════════════════════
+let allProducts   = [];
+let allWaitlist   = [];
+let searchQuery   = '';
+
+function initAdminListeners() {
+  // Products — real-time
+  db.collection('products').onSnapshot(snap => {
+    allProducts = snap.docs.map(doc => ({ _id: doc.id, ...doc.data() }));
+    allProducts.sort((a, b) => a.name.localeCompare(b.name));
+    document.getElementById('statProducts').textContent = allProducts.length;
+    const cats = new Set(allProducts.map(p => p.category).filter(Boolean));
+    document.getElementById('statCats').textContent = cats.size;
+    renderProductTable();
+  }, err => console.error('Products listener error:', err));
+
+  // Waitlist — real-time
+  db.collection('waitlist').onSnapshot(snap => {
+    allWaitlist = snap.docs.map(doc => ({ _id: doc.id, ...doc.data() }));
+    allWaitlist.sort((a, b) => {
+      const ta = a.createdAt?.toDate?.() || new Date(0);
+      const tb = b.createdAt?.toDate?.() || new Date(0);
+      return tb - ta; // newest first
+    });
+    document.getElementById('statWaitlist').textContent = allWaitlist.length;
+    renderWaitlistTable();
+  }, err => console.error('Waitlist listener error:', err));
+}
+
+// ═══════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════
+// IMAGE HANDLING
+// ═══════════════════════════════════════════════
+let selectedFile      = null;
+let selectedBadge     = 'none';
+let urlInputVisible   = false;
+
+function handleDragOver(e)  { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
+function handleDragLeave()  { document.getElementById('dropZone').classList.remove('drag-over'); }
+function handleDrop(e) {
+  e.preventDefault(); handleDragLeave();
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function handleFileSelect(e) { if (e.target.files[0]) processFile(e.target.files[0]); }
+
+function processFile(file) {
+  if (!file.type.startsWith('image/')) { toast('Please select an image file.'); return; }
+  if (file.size > 5 * 1024 * 1024)    { toast('Image must be under 5MB.'); return; }
+  selectedFile = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('imgPreview').src = url;
+  document.getElementById('imgPreviewWrap').style.display = 'block';
+  document.getElementById('prodImgUrl').value = '';
+}
+
+function removeImage() {
+  selectedFile = null;
+  document.getElementById('imgPreview').src = '';
+  document.getElementById('imgPreviewWrap').style.display = 'none';
+  document.getElementById('imageFileInput').value = '';
+  document.getElementById('prodImgUrl').value = '';
+}
+
+function toggleUrlInput() {
+  urlInputVisible = !urlInputVisible;
+  document.getElementById('urlInputWrap').style.display = urlInputVisible ? 'block' : 'none';
+}
+
+function previewFromUrl(url) {
+  if (url.startsWith('http')) {
+    document.getElementById('imgPreview').src = url;
+    document.getElementById('imgPreviewWrap').style.display = 'block';
+    selectedFile = null;
+  }
+}
+
+function selectBadge(btn) {
+  document.querySelectorAll('.badge-opt').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedBadge = btn.dataset.val;
+}
+
+// Image compression before upload
+function compressImage(file, maxW = 1200) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale  = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, 'image/jpeg', 0.85);
+    };
+    img.src = url;
+  });
+}
+
+// ═══════════════════════════════════════════════
+// UPLOAD PRODUCT
+// ═══════════════════════════════════════════════
+async function uploadProduct() {
+  const name  = document.getElementById('prodName').value.trim();
+  const cat   = document.getElementById('prodCat').value;
+  const price = document.getElementById('prodPrice').value;
+  const desc  = document.getElementById('prodDesc').value.trim();
+  const msg   = document.getElementById('uploadMsg');
+  const btn   = document.getElementById('uploadBtn');
+
+  msg.className = 'upload-msg';
+
+  if (!name)                          return showUploadMsg(msg,'error','Product name is required.');
+  if (!cat)                           return showUploadMsg(msg,'error','Please select a category.');
+  if (!price || Number(price) <= 0)   return showUploadMsg(msg,'error','Enter a valid price.');
+  if (!db)                            return showUploadMsg(msg,'error','Firebase not connected. Configure firebase-config.js first.');
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    let imageUrl = document.getElementById('prodImgUrl').value.trim();
+
+    // Upload image to Firebase Storage if file selected
+    if (selectedFile) {
+      btn.textContent = 'Uploading image…';
+      const compressed  = await compressImage(selectedFile);
+      const filename    = `${Date.now()}_${selectedFile.name.replace(/\s+/g,'_')}`;
+      const storageRef  = storage.ref(`products/${filename}`);
+      const uploadTask  = storageRef.put(compressed);
+
+      // Show progress
+      const progressWrap = document.getElementById('progressWrap');
+      const progressFill = document.getElementById('progressFill');
+      const progressText = document.getElementById('progressText');
+      progressWrap.classList.add('show');
+
+      imageUrl = await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed',
+          snap => {
+            const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+            progressFill.style.width = pct + '%';
+            progressText.textContent = `Uploading image… ${pct}%`;
+          },
+          reject,
+          async () => {
+            const url = await storageRef.getDownloadURL();
+            progressWrap.classList.remove('show');
+            resolve(url);
+          }
+        );
+      });
+    }
+
+    // Write to Firestore
+    btn.textContent = 'Saving to catalogue…';
+    await db.collection('products').add({
+      name, category: cat,
+      price: Number(price),
+      description: desc,
+      badge: selectedBadge === 'none' ? '' : selectedBadge,
+      imageUrl: imageUrl || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    showUploadMsg(msg,'success',`"${name}" is now live in the catalogue ✓`);
+    toast(`"${name}" added to the catalogue ✦`);
+    resetForm();
+
+  } catch(e) {
+    console.error(e);
+    showUploadMsg(msg,'error','Upload failed: ' + (e.message || 'Unknown error'));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add to Catalogue →';
+  }
+}
+
+function resetForm() {
+  ['prodName','prodPrice','prodDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('prodCat').value = '';
+  removeImage();
+  document.querySelectorAll('.badge-opt').forEach(b => b.classList.remove('active'));
+  document.querySelector('.badge-opt[data-val="none"]').classList.add('active');
+  selectedBadge = 'none';
+  document.getElementById('progressWrap').classList.remove('show');
+}
+
+function showUploadMsg(el, type, text) {
+  el.className = 'upload-msg ' + type;
+  el.textContent = text;
+  if (type === 'success') setTimeout(() => el.className = 'upload-msg', 4000);
+}
+
+// ═══════════════════════════════════════════════
+// PRODUCT TABLE
+// ═══════════════════════════════════════════════
+function filterProductTable() {
+  searchQuery = (document.getElementById('prodSearch')?.value || '').toLowerCase();
+  renderProductTable();
+}
+
+function renderProductTable() {
+  const filtered = searchQuery
+    ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery) || (p.category||'').toLowerCase().includes(searchQuery))
+    : allProducts;
+
+  const wrap = document.getElementById('productTableWrap');
+  if (!filtered.length) {
+    wrap.innerHTML = `<div class="tbl-empty"><p>${allProducts.length ? 'No results found' : 'No products yet'}</p><span>${allProducts.length ? 'Try a different search term.' : 'Upload your first piece using the form on the left.'}</span></div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Image</th><th>Name</th><th>Category</th>
+        <th>Price</th><th>Badge</th><th>Added</th><th>Action</th>
+      </tr></thead>
+      <tbody>${filtered.map(p => `
+        <tr>
+          <td><img class="prod-thumb" src="${esc(p.imageUrl||blankThumb())}" alt="${esc(p.name)}" onerror="this.src='${blankThumb()}'"/></td>
+          <td class="prod-name-cell">${esc(p.name)}</td>
+          <td class="prod-cat-cell">${esc(p.category||'—')}</td>
+          <td class="prod-price-cell">₦${Number(p.price).toLocaleString('en-NG')}</td>
+          <td>${p.badge ? `<span class="badge-pill ${p.badge==='Sold Out'?'sold':''}">${esc(p.badge)}</span>` : '<span style="color:var(--muted);font-size:.7rem">—</span>'}</td>
+          <td class="wl-date">${fmtDate(p.createdAt)}</td>
+          <td><button class="del-btn" onclick="confirmDelete('product','${p._id}','${esc(p.imageUrl||'')}','${esc(p.name)}')">Delete</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ═══════════════════════════════════════════════
+// WAITLIST TABLE
+// ═══════════════════════════════════════════════
+function renderWaitlistTable() {
+  const wrap = document.getElementById('waitlistTableWrap');
+  if (!allWaitlist.length) {
+    wrap.innerHTML = `<div class="tbl-empty"><p>No waitlist entries yet</p><span>Visitors who sign up on the catalogue will appear here in real time.</span></div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>#</th><th>Name</th><th>WhatsApp</th><th>Gmail</th><th>Signed Up</th><th>Remove</th>
+      </tr></thead>
+      <tbody>${allWaitlist.map((e,i) => `
+        <tr>
+          <td style="color:var(--muted);font-size:.68rem">${i+1}</td>
+          <td>${esc(e.name)}</td>
+          <td class="wl-phone">${esc(e.whatsapp)}</td>
+          <td class="wl-email">${esc(e.email)}</td>
+          <td class="wl-date">${fmtDate(e.createdAt)}</td>
+          <td><button class="del-btn" onclick="confirmDelete('waitlist','${e._id}','','${esc(e.name)}')">Remove</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ═══════════════════════════════════════════════
+// DELETE
+// ═══════════════════════════════════════════════
+let pendingDelete = null;
+
+function confirmDelete(type, id, imageUrl, label) {
+  const isProd = type === 'product';
+  document.getElementById('modalTitle').textContent = isProd ? 'Delete Product' : 'Remove from Waitlist';
+  document.getElementById('modalBody').textContent  = isProd
+    ? `"${label}" will be permanently removed from the catalogue.`
+    : `"${label}" will be removed from the waitlist.`;
+
+  pendingDelete = async () => {
+    try {
+      if (isProd) {
+        await db.collection('products').doc(id).delete();
+        // Also delete image from Storage if it's a Firebase Storage URL
+        if (imageUrl && imageUrl.includes('firebasestorage.googleapis.com')) {
+          try { await storage.refFromURL(imageUrl).delete(); } catch(_) {}
+        }
+        toast('Product deleted.');
+      } else {
+        await db.collection('waitlist').doc(id).delete();
+        toast('Waitlist entry removed.');
+      }
+    } catch(e) {
+      console.error(e);
+      toast('Delete failed: ' + (e.message || 'Unknown error'));
+    }
+    closeModal();
+  };
+
+  document.getElementById('modalConfirmBtn').onclick = pendingDelete;
+  document.getElementById('confirmModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('open');
+  pendingDelete = null;
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT WAITLIST CSV
+// ═══════════════════════════════════════════════
+function exportWaitlistCSV() {
+  if (!allWaitlist.length) { toast('No waitlist entries to export.'); return; }
+  const rows = allWaitlist.map(e =>
+    `"${e.name}","${e.whatsapp}","${e.email}","${fmtDate(e.createdAt)}"`
+  );
+  const csv  = 'Name,WhatsApp,Gmail,Date\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `blackbalance-waitlist-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast(`Exported ${allWaitlist.length} entries as CSV ↓`);
+}
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function fmtDate(ts) {
+  if (!ts) return '—';
+  try {
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' });
+  } catch { return '—'; }
+}
+function esc(str) { const d = document.createElement('div'); d.textContent = String(str||''); return d.innerHTML; }
+function blankThumb() { return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='46' height='58'%3E%3Crect width='46' height='58' fill='%231a1a1a'/%3E%3C/svg%3E`; }
+function toast(msg) {
+  const t = document.getElementById('adminToast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+document.getElementById('confirmModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('confirmModal')) closeModal();
+});
+
+checkSession();
+</script>
+</body>
+</html>
