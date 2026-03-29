@@ -27,12 +27,13 @@
  */
 
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+  apiKey: "AIzaSyAN82zzfTEdwEes9CauvJKNGBdEE7VX98Y",
+  authDomain: "black-balance.firebaseapp.com",
+  projectId: "black-balance",
+  storageBucket: "black-balance.firebasestorage.app",
+  messagingSenderId: "152074558216",
+  appId: "1:152074558216:web:f7efcbf5317f832818eabd",
+  measurementId: "G-P8Q3BS43PK"
 };
 
 /**
