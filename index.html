@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BLACK BALANCE — Nigerian Clothing Brand</title>
@@ -133,6 +134,7 @@
     .product-card:hover .product-img-wrap img { transform: scale(1.06); }
     .product-badge { position: absolute; top: 12px; left: 12px; background: var(--gold); color: var(--black); font-size: .54rem; letter-spacing: .2em; text-transform: uppercase; padding: 4px 10px; font-weight: 500; }
     .product-badge.sold { background: #2a2a2a; color: var(--muted); }
+    .product-badge.pre-order { background: #4c7ac9; }
     .product-overlay { position: absolute; inset: 0; background: rgba(10,10,10,.72); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .3s; }
     .product-card:hover .product-overlay { opacity: 1; }
     .overlay-inner { font-size: .64rem; letter-spacing: .28em; text-transform: uppercase; color: var(--white); border: 1px solid rgba(245,240,232,.5); padding: 10px 22px; }
@@ -308,7 +310,7 @@
   <div class="hero-bg"></div>
   <div class="hero-grid"></div>
   <div class="hero-content">
-    <p class="hero-eyebrow">Lagos · Nigeria · Est. 2024</p>
+    <p class="hero-eyebrow">Lagos · Nigeria · Est. 2025</p>
     <h1 class="hero-title">BLACK<br><span class="gold">BALANCE</span></h1>
     <p class="hero-sub">Where Nigerian heritage meets modern elegance</p>
     <div class="hero-cta">
@@ -402,7 +404,7 @@
     </ul>
   </div>
   <div class="footer-bottom">
-    <span>© 2024 Black Balance. All rights reserved.</span>
+    <span>© 2025 Black Balance by JDG. All rights reserved.</span>
     <span style="color:var(--gold);letter-spacing:.1em">CRAFTED IN NIGERIA</span>
   </div>
 </footer>
@@ -514,7 +516,7 @@ function renderProducts() {
     <div class="product-card" style="animation-delay:${i*.055}s" onclick="openPreviewModal('${p._id}')">
       <div class="product-img-wrap">
         <img src="${esc(p.imageUrl || blankImg())}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='${blankImg()}'"/>
-        ${p.badge ? `<span class="product-badge ${p.badge==='Sold Out'?'sold':''}">${esc(p.badge)}</span>` : ''}
+        ${p.badge ? `<span class="product-badge ${p.badge==='Sold Out'?'sold':''} ${p.badge==='Pre order'?'pre-order':''}">${esc(p.badge)}</span>` : ''}
         <div class="product-overlay"><span class="overlay-inner">View Piece</span></div>
       </div>
       <div class="product-info">

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BLACK BALANCE — Admin Panel</title>
@@ -159,6 +160,8 @@
     .badge-pill.sold { background: rgba(255,255,255,.04); color: var(--muted); border-color: rgba(255,255,255,.08); }
     .del-btn { background: transparent; border: 1px solid rgba(224,85,85,.2); color: var(--red); font-size: .56rem; letter-spacing: .14em; text-transform: uppercase; padding: 5px 11px; transition: background .2s; }
     .del-btn:hover { background: rgba(224,85,85,.1); }
+    .edit-btn { background: transparent; border: 1px solid rgba(76, 137, 201, 0.2); color: #4c89c9; font-size: .56rem; letter-spacing: .14em; text-transform: uppercase; padding: 5px 11px; transition: background .2s; margin-right: 5px; }
+    .edit-btn:hover { background: rgba(76, 137, 201, 0.1); }
     .wl-email { color: var(--gold-light); }
     .wl-phone { font-family: monospace; font-size: .75rem; color: var(--muted); }
     .wl-date { font-size: .68rem; color: var(--muted); }
@@ -284,6 +287,7 @@
           <button class="badge-opt active" data-val="none"     onclick="selectBadge(this)">None</button>
           <button class="badge-opt"        data-val="New"      onclick="selectBadge(this)">New</button>
           <button class="badge-opt"        data-val="Limited"  onclick="selectBadge(this)">Limited</button>
+          <button class="badge-opt"        data-val="Pre order" onclick="selectBadge(this)">Pre order</button>
           <button class="badge-opt"        data-val="Sold Out" onclick="selectBadge(this)">Sold Out</button>
         </div>
       </div>
@@ -314,6 +318,7 @@
 
       <div class="upload-msg" id="uploadMsg"></div>
       <button class="upload-btn" id="uploadBtn" onclick="uploadProduct()">Add to Catalogue →</button>
+      <button class="modal-cancel" id="cancelEditBtn" onclick="cancelEdit()" style="display:none; width:100%; margin-top: 8px; justify-content:center;">Cancel Edit</button>
     </aside>
 
     <!-- CONTENT AREA -->
@@ -488,6 +493,7 @@ function switchTab(name, btn) {
 let selectedFile      = null;
 let selectedBadge     = 'none';
 let urlInputVisible   = false;
+let editingProductId  = null;
 
 function handleDragOver(e)  { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
 function handleDragLeave()  { document.getElementById('dropZone').classList.remove('drag-over'); }
@@ -553,6 +559,49 @@ function compressImage(file, maxW = 1200) {
 }
 
 // ═══════════════════════════════════════════════
+// PRODUCT EDIT
+// ═══════════════════════════════════════════════
+function openEditForm(productId) {
+  const product = allProducts.find(p => p._id === productId);
+  if (!product) {
+    toast('Error: Product not found.');
+    return;
+  }
+
+  editingProductId = productId;
+
+  // Populate form
+  document.getElementById('prodName').value = product.name;
+  document.getElementById('prodCat').value = product.category;
+  document.getElementById('prodPrice').value = product.price;
+  document.getElementById('prodDesc').value = product.description || '';
+
+  // Set badge
+  selectBadge(document.querySelector(`.badge-opt[data-val="${product.badge || 'none'}"]`));
+
+  // Set image
+  if (product.imageUrl) {
+    document.getElementById('imgPreview').src = product.imageUrl;
+    document.getElementById('imgPreviewWrap').style.display = 'block';
+    document.getElementById('prodImgUrl').value = product.imageUrl;
+    selectedFile = null;
+  }
+
+  // Update UI
+  document.querySelector('.sidebar-title').textContent = 'Edit Product';
+  document.getElementById('uploadBtn').textContent = 'Update Product →';
+  document.getElementById('cancelEditBtn').style.display = 'inline-block';
+  
+  // Scroll to top of form
+  document.querySelector('.sidebar').scrollTop = 0;
+  document.getElementById('prodName').focus();
+}
+
+function cancelEdit() {
+  resetForm();
+}
+
+// ═══════════════════════════════════════════════
 // UPLOAD PRODUCT
 // ═══════════════════════════════════════════════
 async function uploadProduct() {
@@ -575,7 +624,7 @@ async function uploadProduct() {
   try {
     let imageUrl = document.getElementById('prodImgUrl').value.trim();
 
-    // Upload image to Firebase Storage if file selected
+    // Upload image to Firebase Storage if a new file is selected
     if (selectedFile) {
       btn.textContent = 'Uploading image…';
       const compressed  = await compressImage(selectedFile);
@@ -583,7 +632,6 @@ async function uploadProduct() {
       const storageRef  = storage.ref(`products/${filename}`);
       const uploadTask  = storageRef.put(compressed);
 
-      // Show progress
       const progressWrap = document.getElementById('progressWrap');
       const progressFill = document.getElementById('progressFill');
       const progressText = document.getElementById('progressText');
@@ -606,26 +654,37 @@ async function uploadProduct() {
       });
     }
 
-    // Write to Firestore
-    btn.textContent = 'Saving to catalogue…';
-    await db.collection('products').add({
+    const productData = {
       name, category: cat,
       price: Number(price),
       description: desc,
       badge: selectedBadge === 'none' ? '' : selectedBadge,
       imageUrl: imageUrl || '',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
 
-    showUploadMsg(msg,'success',`"${name}" is now live in the catalogue ✓`);
-    toast(`"${name}" added to the catalogue ✦`);
+    if (editingProductId) {
+      // Update existing product
+      btn.textContent = 'Updating product…';
+      await db.collection('products').doc(editingProductId).update(productData);
+      showUploadMsg(msg,'success',`"${name}" was successfully updated ✓`);
+      toast(`"${name}" updated.`);
+    } else {
+      // Add new product
+      btn.textContent = 'Saving to catalogue…';
+      productData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('products').add(productData);
+      showUploadMsg(msg,'success',`"${name}" is now live in the catalogue ✓`);
+      toast(`"${name}" added to the catalogue ✦`);
+    }
+
     resetForm();
 
   } catch(e) {
     console.error(e);
     showUploadMsg(msg,'error','Upload failed: ' + (e.message || 'Unknown error'));
   } finally {
-    btn.disabled = false; btn.textContent = 'Add to Catalogue →';
+    btn.disabled = false;
+    // The text is reset in resetForm()
   }
 }
 
@@ -637,6 +696,13 @@ function resetForm() {
   document.querySelector('.badge-opt[data-val="none"]').classList.add('active');
   selectedBadge = 'none';
   document.getElementById('progressWrap').classList.remove('show');
+
+  // Reset edit state
+  editingProductId = null;
+  document.querySelector('.sidebar-title').textContent = 'Upload Product';
+  document.getElementById('uploadBtn').textContent = 'Add to Catalogue →';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  document.getElementById('uploadBtn').disabled = false;
 }
 
 function showUploadMsg(el, type, text) {
@@ -668,7 +734,7 @@ function renderProductTable() {
     <table class="data-table">
       <thead><tr>
         <th>Image</th><th>Name</th><th>Category</th>
-        <th>Price</th><th>Badge</th><th>Added</th><th>Action</th>
+        <th>Price</th><th>Badge</th><th>Added</th><th>Actions</th>
       </tr></thead>
       <tbody>${filtered.map(p => `
         <tr>
@@ -678,7 +744,10 @@ function renderProductTable() {
           <td class="prod-price-cell">₦${Number(p.price).toLocaleString('en-NG')}</td>
           <td>${p.badge ? `<span class="badge-pill ${p.badge==='Sold Out'?'sold':''}">${esc(p.badge)}</span>` : '<span style="color:var(--muted);font-size:.7rem">—</span>'}</td>
           <td class="wl-date">${fmtDate(p.createdAt)}</td>
-          <td><button class="del-btn" onclick="confirmDelete('product','${p._id}','${esc(p.imageUrl||'')}','${esc(p.name)}')">Delete</button></td>
+          <td>
+            <button class="edit-btn" onclick="openEditForm('${p._id}')">Edit</button>
+            <button class="del-btn" onclick="confirmDelete('product','${p._id}','${esc(p.imageUrl||'')}','${esc(p.name)}')">Delete</button>
+          </td>
         </tr>`).join('')}
       </tbody>
     </table>`;
