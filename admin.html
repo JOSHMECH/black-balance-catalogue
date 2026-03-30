@@ -185,6 +185,10 @@
     .modal-confirm { background: var(--red); border: none; color: #fff; font-family: 'DM Sans', sans-serif; font-size: .63rem; letter-spacing: .14em; text-transform: uppercase; padding: 9px 18px; transition: opacity .2s; }
     .modal-confirm:hover { opacity: .85; }
 
+    /* MESSAGE MODAL */
+    #messageModal { position: fixed; inset: 0; background: rgba(0,0,0,.8); display: none; align-items: center; justify-content: center; z-index: 800; }
+    #messageModal.open { display: flex; }
+
     /* TOAST */
     #adminToast { position: fixed; bottom: 28px; right: 28px; background: var(--card); border: 1px solid var(--gold); color: var(--white); padding: 13px 22px; font-size: .78rem; z-index: 9000; transform: translateY(18px); opacity: 0; transition: all .3s; pointer-events: none; max-width: 320px; }
     #adminToast.show { transform: translateY(0); opacity: 1; }
@@ -362,6 +366,7 @@
         <div class="tbl-head">
           <span class="tbl-title">Waitlist</span>
           <button class="export-btn" onclick="exportWaitlistCSV()">Export CSV ↓</button>
+          <button class="export-btn" onclick="openMessageModal()">Send a message</button>
         </div>
         <div id="waitlistTableWrap"></div>
       </div>
@@ -377,6 +382,21 @@
     <div class="modal-actions">
       <button class="modal-cancel"  onclick="closeModal()">Cancel</button>
       <button class="modal-confirm" id="modalConfirmBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- MESSAGE MODAL -->
+<div id="messageModal">
+  <div class="modal-box" style="max-width: 500px;">
+    <p class="modal-title">Send a message to the waitlist</p>
+    <div class="form-section">
+      <label class="field-label" for="messageText">Message</label>
+      <textarea class="field-textarea" id="messageText" placeholder="Write your message here..." style="min-height: 120px;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeMessageModal()">Cancel</button>
+      <button class="modal-confirm" style="background-color: var(--green);" onclick="sendMessage()">Send</button>
     </div>
   </div>
 </div>
@@ -820,6 +840,38 @@ function closeModal() {
   document.getElementById('confirmModal').classList.remove('open');
   pendingDelete = null;
 }
+
+// ═══════════════════════════════════════════════
+// MESSAGE MODAL
+// ═══════════════════════════════════════════════
+function openMessageModal() {
+  document.getElementById('messageModal').classList.add('open');
+}
+
+function closeMessageModal() {
+  document.getElementById('messageModal').classList.remove('open');
+}
+
+function sendMessage() {
+  const message = document.getElementById('messageText').value;
+  if (!message) {
+    toast('Please write a message.');
+    return;
+  }
+
+  const emails = allWaitlist.map(user => user.email).join(',');
+  const mailtoLink = `mailto:${emails}?subject=Black Balance Waitlist&body=${encodeURIComponent(message)}`;
+  window.open(mailtoLink, '_blank');
+
+  allWaitlist.forEach(user => {
+    const whatsappLink = `https://wa.me/${user.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappLink, '_blank');
+  });
+
+  toast('Message sent!');
+  closeMessageModal();
+}
+
 
 // ═══════════════════════════════════════════════
 // EXPORT WAITLIST CSV
