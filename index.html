@@ -579,7 +579,6 @@ async function submitWaitlist() {
       name, whatsapp, email,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    sendWelcomeMessage(email, whatsapp, name);
     setTimeout(() => {
       document.getElementById('waitlistFormWrap').style.display = 'none';
       document.getElementById('waitlistSuccess').classList.add('show');
@@ -590,17 +589,6 @@ async function submitWaitlist() {
     showMsg(msg,'error','Something went wrong. Please try again.');
     btn.disabled = false; btn.textContent = 'Secure My Spot →';
   }
-}
-
-// ── SEND WELCOME MESSAGE ──
-function sendWelcomeMessage(email, whatsapp, name) {
-  const message = `Hey ${name}, you are welcome to the Black Balance waitlist. Stay tuned for more product updates.`;
-
-  const mailtoLink = `mailto:${email}?subject=Welcome to the Black Balance Waitlist&body=${encodeURIComponent(message)}`;
-  window.open(mailtoLink, '_blank');
-
-  const whatsappLink = `https://wa.me/${whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-  window.open(whatsappLink, '_blank');
 }
 
 // ── HELPERS ──
