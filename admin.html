@@ -859,16 +859,12 @@ function sendMessage() {
     return;
   }
 
+  // Use BCC to protect user privacy by not exposing all emails to every recipient.
   const emails = allWaitlist.map(user => user.email).join(',');
-  const mailtoLink = `mailto:${emails}?subject=Black Balance Waitlist&body=${encodeURIComponent(message)}`;
+  const mailtoLink = `mailto:?bcc=${emails}&subject=Black Balance Waitlist&body=${encodeURIComponent(message)}`;
   window.open(mailtoLink, '_blank');
 
-  allWaitlist.forEach(user => {
-    const whatsappLink = `https://wa.me/${user.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappLink, '_blank');
-  });
-
-  toast('Message sent!');
+  toast('Your email client is opening to send the message.');
   closeMessageModal();
 }
 
